@@ -33,6 +33,7 @@ Example output format:
 
 Available functions:
 {defs}\n""")[0].tolist()
+        self.defs: list[dict] = json.loads(defs)
 
     def inspect(self, s: str) -> None:
         "Neatly print the tokens making up a string."
@@ -54,6 +55,14 @@ Available functions:
         function_calls += [json.loads(obj)]
         with path.open('w') as f:
             json.dump(function_calls, f, indent='\t')
+
+    def collapse(
+            self,
+            token_string: list[int],
+            options: list[list[int]]
+            ) -> list[int]:
+        result = []
+        return result
 
     def process_prompt(self, prompt: str, limit: int = 50) -> str:
         """Generate up to `limit` tokens, completing `prompt`.

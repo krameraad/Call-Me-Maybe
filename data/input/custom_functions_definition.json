@@ -1,0 +1,20 @@
+[
+  {
+    "name": "fn_create_vector",
+    "description": "Create a three-dimensional vector out of three values.",
+    "parameters": {
+      "x": {
+        "type": "number"
+      },
+      "y": {
+        "type": "number"
+      },
+      "z": {
+        "type": "number"
+      }
+    },
+    "returns": {
+      "type": "vector"
+    }
+  }
+]

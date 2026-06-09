@@ -1,14 +1,14 @@
 [
   {
-    "prompt": "Greet john"
+    "prompt": "Create a vector with values 3, 8, -5."
   },
   {
-    "prompt": "What is the sum of 2 and 3?"
+    "prompt": "Make a vector out of the list [-1, -1, 0]"
   },
   {
-    "prompt": "Reverse the string 'hello'"
+    "prompt": "Create a vector from (0.6, 0.89, 5.06)."
   },
   {
-    "prompt": "What is the square root of 16?"
+    "prompt": "(-9.4, 7.001, 6) -> Vector"
   }
 ]

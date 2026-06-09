@@ -7,12 +7,17 @@ run:
 		--input data/input/function_calling_tests.json \
 		--output data/output/function_calls.json
 
-test:
+test_custom:
+	uv run python -m src \
+		--functions_definition data/input/custom_functions_definition.json \
+		--input data/input/custom_function_calling_tests.json \
+		--output data/output/function_calls.json
+
+test_regex:
 	uv run python -m src \
 		--functions_definition data/input/functions_definition.json \
-		--input data/input/custom_function_calling_tests.json \
-		--output data/output/function_calls.json \
-		-i
+		--input data/input/regex_function_calling_tests.json \
+		--output data/output/function_calls.json
 
 debug:
 	uv run python -m pdb __main__.py

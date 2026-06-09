@@ -46,16 +46,19 @@ except Exception:
 # Run prompts through LLM.
 # -----------------------------------------------------------------------------
 interface = LLMInterface(defs)
-with open("data/output/vocab.json", 'w') as f:
-    json.dump(interface.vocab, f)
+with (path_output.parent / 'vocab.json').open('w') as f:
+    json.dump(interface.vocab, f, indent='\t')
 
 time_start = time.perf_counter()
 for test in tests:
     try:
-        obj = interface.process_prompt(test["prompt"])
-        interface.dump(obj, path_output)
+        obj = interface.process_prompt(test["prompt"].replace('"', '\\"'))
+        try:
+            interface.dump(obj, path_output)
+        except json.JSONDecodeError as e:
+            print(H + R + f'\nError: {e}' + X, file=sys.stderr)
     except RuntimeError as e:
-        print('\n' + H + R + str(e) + X, file=sys.stderr)
+        print(H + R + f'\nError: {e}' + X, file=sys.stderr)
     if inspect:
         interface.inspect(obj)
 
