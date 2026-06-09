@@ -1,0 +1,12 @@
+"Macros for terminal text formatting."
+
+X = "\033[0m"
+"Clear all text formatting."
+H = "\033[1m"
+"Header (bold) formatting."
+U = "\033[4m"
+"Underlined formatting."
+R = "\033[91m"
+"Red color formatting."
+C = "\033[96m"
+"Red color formatting."
