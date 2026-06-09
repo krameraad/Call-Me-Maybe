@@ -5,7 +5,7 @@ from pathlib import Path
 from llm_sdk.llm_sdk import Small_LLM_Model
 
 from .output_state import OutputState
-from .formatting import X, H, U, R, C
+from .formatting import X, H, U, C
 
 
 class LLMInterface:
@@ -91,7 +91,7 @@ Available functions:
             if next_token == 95642:
                 break
         else:
-            print(f"\n{H + R}Token limit ({limit}) reached! Aborting.{X}")
+            raise RuntimeError(f"Token limit ({limit}) reached.")
 
         print(
             f"\n{H}Response finished in "

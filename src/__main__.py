@@ -5,10 +5,10 @@ import sys
 from pathlib import Path
 
 from .llm_interface import LLMInterface
-from .formatting import X, H
+from .formatting import X, H, R
 
 
-# Parsing arguments.
+# Parse arguments.
 # -----------------------------------------------------------------------------
 parser = argparse.ArgumentParser(
     prog='call_me_maybe',
@@ -51,8 +51,11 @@ with open("data/output/vocab.json", 'w') as f:
 
 time_start = time.perf_counter()
 for test in tests:
-    obj = interface.process_prompt(test["prompt"])
-    interface.dump(obj, path_output)
+    try:
+        obj = interface.process_prompt(test["prompt"])
+        interface.dump(obj, path_output)
+    except RuntimeError as e:
+        print('\n' + H + R + str(e) + X, file=sys.stderr)
     if inspect:
         interface.inspect(obj)
 
