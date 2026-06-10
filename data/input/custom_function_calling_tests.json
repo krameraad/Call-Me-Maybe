@@ -9,6 +9,9 @@
     "prompt": "Create a vector from (0.6, 0.89, 5.06)."
   },
   {
-    "prompt": "(-9.4, 7.001, 6) -> Vector"
+    "prompt": "Create a vector with values -78, -79."
+  },
+  {
+    "prompt": "Create a vector from (-5.3, 239.91966)."
   }
 ]

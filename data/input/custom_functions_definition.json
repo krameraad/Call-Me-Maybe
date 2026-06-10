@@ -1,6 +1,21 @@
 [
   {
-    "name": "fn_create_vector",
+    "name": "fn_create_vector2d",
+    "description": "Create a two-dimensional vector out of two values.",
+    "parameters": {
+      "x": {
+        "type": "number"
+      },
+      "y": {
+        "type": "number"
+      }
+    },
+    "returns": {
+      "type": "vector2d"
+    }
+  },
+  {
+    "name": "fn_create_vector3d",
     "description": "Create a three-dimensional vector out of three values.",
     "parameters": {
       "x": {
@@ -14,7 +29,7 @@
       }
     },
     "returns": {
-      "type": "vector"
+      "type": "vector3d"
     }
   }
 ]

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from llm_sdk.llm_sdk import Small_LLM_Model
 
-from .output_state import OutputState
+from .expect import Expect, ExpectFunction, ExpectParameter
 from .formatting import X, H, U, C
 
 
@@ -16,7 +16,7 @@ class LLMInterface:
                 Path(self.model.get_path_to_vocab_file()).read_text()
             ).keys()
         )
-        self.context = self.model.encode(f"""
+        self.context = self.get_tokens(f"""
 Generate a JSON object that represents a function call from a prompt.
 The prompt should not be solved, only the parameters and
 function name need to be given to be used to solve it.
@@ -32,8 +32,11 @@ Example output format:
 "parameters": {{"a": 2.0, "b": 3.0}}'
 
 Available functions:
-{defs}\n""")[0].tolist()
+{defs}\n""")
         self.defs: list[dict] = json.loads(defs)
+
+    def get_tokens(self, s: str) -> list[int]:
+        return self.model.encode(s)[0].tolist()
 
     def inspect(self, s: str) -> None:
         "Neatly print the tokens making up a string."
@@ -56,49 +59,49 @@ Available functions:
         with path.open('w') as f:
             json.dump(function_calls, f, indent='\t')
 
-    def collapse(
-            self,
-            token_string: list[int],
-            options: list[list[int]]
-            ) -> list[int]:
-        result = []
-        return result
-
     def process_prompt(self, prompt: str, limit: int = 50) -> str:
         """Generate up to `limit` tokens, completing `prompt`.
         Returns the result decoded to a string."""
         print(f"{H + U + C}\nPrompt{X}\n{prompt}")
         time_start = time.perf_counter()
 
-        context = self.context + self.model.encode(
-            f'Prompt: "{prompt}"\nJSON output: ')[0].tolist()
-        output = self.model.encode(
-            f'{{"prompt": "{prompt}", "name": "'
-        )[0].tolist()
-        state = OutputState.FUNC_NAME
+        context = self.context + self.get_tokens(
+            f'Prompt: "{prompt}"\nJSON output: ')
+        output = self.get_tokens(f'{{"prompt": "{prompt}", "name": "')
+        state = ExpectFunction(
+            [self.get_tokens(x['name']) for x in self.defs])
+        # state = OutputState.FUNC_NAME
 
         print(f"{H + U + C}Response{X}\n{self.model.decode(output)}", end='')
         for _ in range(limit):
+            allowed = state.valid_tokens()
+            print(allowed, end='')
             logits = self.model.get_logits_from_input_ids(context + output)
+
+            for i in range(len(logits)):
+                if i not in allowed:
+                    logits[i] = float('-inf')
+
             next_token = logits.index(max(logits))
-            output += [next_token]
+            state.tokens.append(next_token)
+            output.append(next_token)
             print(self.model.decode([next_token]), end='', flush=True)
 
-            if next_token == 497 and state == OutputState.FUNC_NAME:
-                state = OutputState.PARAM_START
-                output += [330, 13786, 788, 5212]
-                print(' "parameters": {"', end='', flush=True)
-            if next_token == 788 and state == OutputState.PARAM_START:
-                state = OutputState.PARAM_END
-                output += [330]
-                print(' "', end='', flush=True)
-            if next_token == 497 and state == OutputState.PARAM_END:
-                state = OutputState.PARAM_START
-                output += [330]
-                print(' "', end='', flush=True)
+            # if next_token == 497 and state == OutputState.FUNC_NAME:
+            #     state = OutputState.PARAM_START
+            #     output += [330, 13786, 788, 5212]
+            #     print(' "parameters": {"', end='', flush=True)
+            # if next_token == 788 and state == OutputState.PARAM_START:
+            #     state = OutputState.PARAM_END
+            #     output += [330]
+            #     print(' "', end='', flush=True)
+            # if next_token == 497 and state == OutputState.PARAM_END:
+            #     state = OutputState.PARAM_START
+            #     output += [330]
+            #     print(' "', end='', flush=True)
 
-            if next_token == 95642:
-                break
+            # if next_token == 95642:
+            #     break
         else:
             raise RuntimeError(f"Token limit ({limit}) reached.")
 
