@@ -4,8 +4,8 @@ from pathlib import Path
 
 from llm_sdk.llm_sdk import Small_LLM_Model
 
-from .expect import Expect, ExpectFunction, ExpectParameter
-from .formatting import X, H, U, C
+from .expect import ExpectFunction, ExpectParameters
+from .formatting import X, H, U, C, D
 
 
 class LLMInterface:
@@ -35,6 +35,20 @@ Available functions:
 {defs}\n""")
         self.defs: list[dict] = json.loads(defs)
 
+    def add_token(
+            self,
+            output: list[int],
+            state_tokens: list[int],
+            token: int,
+            autocomplete: bool
+            ) -> None:
+        state_tokens.append(token)
+        output.append(token)
+        if autocomplete:
+            print(f"{D + self.model.decode([token]) + X}", end='', flush=True)
+        else:
+            print(self.model.decode([token]), end='', flush=True)
+
     def get_tokens(self, s: str) -> list[int]:
         return self.model.encode(s)[0].tolist()
 
@@ -45,7 +59,8 @@ Available functions:
             print(f"{token:>8} | {self.vocab[token]}")
         print()
 
-    def dump(self, obj: str, path: Path) -> None:
+    @staticmethod
+    def dump(obj: str, path: Path) -> None:
         """Dump `obj` as a JSON string into the file pointed to by `path`.
         Appends the object to a JSON array if one is present in the file."""
         path.parent.mkdir(exist_ok=True)
@@ -67,41 +82,29 @@ Available functions:
 
         context = self.context + self.get_tokens(
             f'Prompt: "{prompt}"\nJSON output: ')
-        output = self.get_tokens(f'{{"prompt": "{prompt}", "name": "')
+        output = self.get_tokens(f'{{"prompt":"{prompt}","name":"')
         state = ExpectFunction(
             [self.get_tokens(x['name']) for x in self.defs])
-        # state = OutputState.FUNC_NAME
 
-        print(f"{H + U + C}Response{X}\n{self.model.decode(output)}", end='')
+        print(f"{H + U + C}Response{X}\n"
+              f"{D + self.model.decode(output) + X}", end='')
         for _ in range(limit):
             allowed = state.valid_tokens()
-            print(allowed, end='')
-            logits = self.model.get_logits_from_input_ids(context + output)
+            if not allowed:
+                state = state.next_state(self.get_tokens)
+                continue
+            if len(allowed) == 1:
+                next_token = allowed.pop()
+                self.add_token(output, state.tokens, next_token, True)
+                continue
 
+            logits = self.model.get_logits_from_input_ids(context + output)
             for i in range(len(logits)):
                 if i not in allowed:
                     logits[i] = float('-inf')
 
             next_token = logits.index(max(logits))
-            state.tokens.append(next_token)
-            output.append(next_token)
-            print(self.model.decode([next_token]), end='', flush=True)
-
-            # if next_token == 497 and state == OutputState.FUNC_NAME:
-            #     state = OutputState.PARAM_START
-            #     output += [330, 13786, 788, 5212]
-            #     print(' "parameters": {"', end='', flush=True)
-            # if next_token == 788 and state == OutputState.PARAM_START:
-            #     state = OutputState.PARAM_END
-            #     output += [330]
-            #     print(' "', end='', flush=True)
-            # if next_token == 497 and state == OutputState.PARAM_END:
-            #     state = OutputState.PARAM_START
-            #     output += [330]
-            #     print(' "', end='', flush=True)
-
-            # if next_token == 95642:
-            #     break
+            self.add_token(output, state.tokens, next_token, False)
         else:
             raise RuntimeError(f"Token limit ({limit}) reached.")
 

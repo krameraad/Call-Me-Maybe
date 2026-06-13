@@ -59,6 +59,8 @@ for test in tests:
             print(H + R + f'\nError: {e}' + X, file=sys.stderr)
     except RuntimeError as e:
         print(H + R + f'\nError: {e}' + X, file=sys.stderr)
+    except KeyboardInterrupt:
+        sys.exit(1)
     if inspect:
         interface.inspect(obj)
 
