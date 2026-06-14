@@ -17,19 +17,10 @@ class LLMInterface:
             ).keys()
         )
         self.context = self.get_tokens(f"""
-Generate a JSON object that represents a function call from a prompt.
-The prompt should not be solved, only the parameters and
-function name need to be given to be used to solve it.
-
-The JSON object contains exactly three keys:
-- Prompt: Exact prompt used to create the object.
-- Name: Name of the function called to solve the question.
-- Parameters: Dictionary of the parameters' names and values.
-
 Example output format:
 {{"prompt": "What is the sum of 2 and 3?",\
 "name": "fn_add_numbers",\
-"parameters": {{"a": 2.0, "b": 3.0}}'
+"parameters": {{"a": 2, "b": 3}}'
 
 Available functions:
 {defs}\n""")
