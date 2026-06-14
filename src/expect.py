@@ -25,6 +25,9 @@ class Expect(ABC):
 
         return result
 
+    def exit_tokens(self) -> set:
+        return set()
+
     @abstractmethod
     def get_allowed(self) -> set:
         raise NotImplementedError()
@@ -67,10 +70,13 @@ class ExpectSep(Expect):
 
 
 class ExpectValue(Expect):
+    def exit_tokens(self):
+        return {1, 497, 2198, 95642}
+
     def get_allowed(self) -> set:  # 2 / 3
-        if len(self.tokens) <= 3:
-            return self.valid_tokens(((16, 16), (16, 17), (17, 16), (17, 17)))
-        return set()
+        if self.tokens and self.tokens[-1] in {1, 497, 2198, 95642}:
+            return set()
+        return {-1, -2}
 
     def next_state(self) -> ExpectEnd | ExpectSep:
         if not self.context:

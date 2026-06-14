@@ -27,8 +27,8 @@ The JSON object contains exactly three keys:
 - Parameters: Dictionary of the parameters' names and values.
 
 Example output format:
-{{"prompt": "What is the sum of 2 and 3?", \
-"name": "fn_add_numbers", \
+{{"prompt": "What is the sum of 2 and 3?",\
+"name": "fn_add_numbers",\
 "parameters": {{"a": 2.0, "b": 3.0}}'
 
 Available functions:
@@ -79,7 +79,7 @@ Available functions:
         with path.open('w') as f:
             json.dump(function_calls, f, indent='\t')
 
-    def process_prompt(self, prompt: str, limit: int = 50) -> str:
+    def process_prompt(self, prompt: str, limit: int = 100) -> str:
         """Generate up to `limit` tokens, completing `prompt`.
         Returns the result decoded to a string."""
         print(f"{H + U + C}\nPrompt{X}\n{prompt}")
@@ -105,11 +105,15 @@ Available functions:
                 continue
 
             logits = self.model.get_logits_from_input_ids(context + output)
-            for i in range(len(logits)):
-                if i not in allowed:
-                    logits[i] = float('-inf')
+            if -1 not in allowed:
+                for i in range(len(logits)):
+                    if i not in allowed:
+                        logits[i] = float('-inf')
 
             next_token = logits.index(max(logits))
+            if next_token in state.exit_tokens():
+                state.tokens.append(next_token)
+                continue
             self.add_token(output, state.tokens, next_token, False)
         else:
             raise RuntimeError(f"Token limit ({limit}) reached.")

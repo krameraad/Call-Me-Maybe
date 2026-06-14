@@ -46,8 +46,9 @@ except Exception:
 # Run prompts through LLM.
 # -----------------------------------------------------------------------------
 interface = LLMInterface(defs)
-with (path_output.parent / 'vocab.json').open('w') as f:
-    json.dump(interface.vocab, f, indent='\t')
+with (path_output.parent / 'vocab.txt').open('w') as f:
+    for i, token in enumerate(interface.vocab):
+        f.write(f'{i:>8} {token}\n')
 
 time_start = time.perf_counter()
 for test in tests:
