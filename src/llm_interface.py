@@ -4,7 +4,7 @@ from pathlib import Path
 
 from llm_sdk.llm_sdk import Small_LLM_Model
 
-from .expect import ExpectFunction, ExpectParameters
+from .expect import ExpectFunction
 from .formatting import X, H, U, C, D
 
 
@@ -33,7 +33,12 @@ Example output format:
 
 Available functions:
 {defs}\n""")
-        self.defs: list[dict] = json.loads(defs)
+        self.defs: dict[tuple[int], list[tuple[int]]] = {
+            tuple(self.get_tokens(x["name"])): [
+                tuple(self.get_tokens(y)) for y in x["parameters"].keys()
+            ]
+            for x in json.loads(defs)
+        }
 
     def add_token(
             self,
@@ -83,15 +88,16 @@ Available functions:
         context = self.context + self.get_tokens(
             f'Prompt: "{prompt}"\nJSON output: ')
         output = self.get_tokens(f'{{"prompt":"{prompt}","name":"')
-        state = ExpectFunction(
-            [self.get_tokens(x['name']) for x in self.defs])
+        state = ExpectFunction(self.defs)
 
         print(f"{H + U + C}Response{X}\n"
               f"{D + self.model.decode(output) + X}", end='')
         for _ in range(limit):
-            allowed = state.valid_tokens()
+            allowed = state.get_allowed()
             if not allowed:
-                state = state.next_state(self.get_tokens)
+                state = state.next_state()
+                if not state:
+                    break
                 continue
             if len(allowed) == 1:
                 next_token = allowed.pop()
