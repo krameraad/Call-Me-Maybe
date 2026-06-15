@@ -12,27 +12,25 @@ class LLMInterface:
     """Interface class to assist in interacting with an LLM."""
     def __init__(self, defs: str):
         self.model = Small_LLM_Model()
-        "Model retrieved from Hugging Face Hub."
+        "Model interface provided by LLM SDK."
+
         self.vocab: list[str] = list(
             json.loads(
                 Path(self.model.get_path_to_vocab_file()).read_text()
             ).keys()
         )
         "List of all tokens the model has in its vocabulary."
-        self.context = self.get_tokens(f"""
-Example output format:
-{{"prompt": "What is the sum of 2 and 3?",\
-"name": "fn_add_numbers",\
-"parameters": {{"a": 2, "b": 3}}'
 
-Available functions:
-{defs}\n""")
+        defs_obj = json.loads(defs)
+        self.context = self.get_tokens(f"""Available functions:
+{'\n'.join([': '.join([x['name'], x['description']]) for x in defs_obj])}""")
         "General context used to improve results for all prompts."
+        print(f"{H + U + C}Context{X}\n{self.model.decode(self.context)}")
         self.defs: dict[tuple[int], list[tuple[int]]] = {
             tuple(self.get_tokens(x["name"])): [
                 tuple(self.get_tokens(y)) for y in x["parameters"].keys()
             ]
-            for x in json.loads(defs)
+            for x in defs_obj
         }
         "Dictionary of functions and their parameters, encoded as int tuples."
 
@@ -57,10 +55,12 @@ Available functions:
 
     def inspect(self, s: str) -> None:
         "Neatly print the tokens making up a string."
-        print(f"{H + U}\nTokens{X}")
+        print(f"""{D + "─" * 9}┬{"─" * 30 + X}
+{H}Token{X}    {D}│{X} {H}String{X}
+{D + "─" * 9}┴{"─" * 30 + X}""")
         for token in self.get_tokens(s):
-            print(f"{token:>8} | {self.vocab[token]}")
-        print()
+            print(f"{token:>8} {D}│{X} {self.vocab[token]}")
+        print(f"{D + "─" * 9}┴{"─" * 30 + X}")
 
     @staticmethod
     def dump(obj: str, path: Path) -> None:
@@ -84,7 +84,7 @@ Available functions:
         time_start = time.perf_counter()
 
         context = self.context + self.get_tokens(
-            f'Prompt: "{prompt}"\nJSON output: ')
+            f'\nPrompt: "{prompt}"\nJSON output: ')
         output = self.get_tokens(f'{{"prompt":"{prompt}","name":"')
         state = ExpectFunction(self.defs)
 
@@ -109,8 +109,11 @@ Available functions:
                         logits[i] = float('-inf')
 
             next_token = logits.index(max(logits))
-            if next_token in state.exit_tokens():
-                state.tokens.append(next_token)
+            if state.early_exit(
+                    self.model.decode(state.tokens + [next_token])):
+                state = state.next_state()
+                if not state:
+                    break
                 continue
             self.add_token(output, state.tokens, next_token, False)
         else:
