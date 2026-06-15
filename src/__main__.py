@@ -31,13 +31,16 @@ parser.add_argument(
     '-i', '--inspect',
     action='store_true',
     help='print token information for prompt results')
+parser.add_argument(
+    '-d', '--dump',
+    action='store_true',
+    help='dump vocabulary of the model')
 
 args = parser.parse_args()
 try:
     defs = Path(args.functions_definition).read_text()
     tests: list[dict[str, str]] = json.loads(Path(args.input).read_text())
     path_output = Path(args.output)
-    inspect = bool(args.inspect)
 except Exception:
     parser.print_help()
     sys.exit(1)
@@ -46,9 +49,15 @@ except Exception:
 # Run prompts through LLM.
 # -----------------------------------------------------------------------------
 interface = LLMInterface(defs)
-with (path_output.parent / 'vocab.txt').open('w') as f:
-    for i, token in enumerate(interface.vocab):
-        f.write(f'{i:>8} {token}\n')
+if args.dump:
+    try:
+        with (path_output.parent / 'vocab.txt').open('w') as f:
+            for i, token in enumerate(interface.vocab):
+                f.write(f'{i:>8} {token}\n')
+        print(f"{H}Successfully dumped model vocabulary.{X}\n")
+    except OSError as e:
+        print(H + R + f'Error while dumping vocabulary: {e}' + X,
+              file=sys.stderr)
 
 time_start = time.perf_counter()
 for test in tests:
@@ -56,13 +65,13 @@ for test in tests:
         obj = interface.process_prompt(test["prompt"].replace('"', '\\"'))
         try:
             interface.dump(obj, path_output)
-        except json.JSONDecodeError as e:
+        except (json.JSONDecodeError, OSError) as e:
             print(H + R + f'\nError: {e}' + X, file=sys.stderr)
     except RuntimeError as e:
         print(H + R + f'\nError: {e}' + X, file=sys.stderr)
     except KeyboardInterrupt:
         sys.exit(1)
-    if inspect:
+    if args.inspect:
         interface.inspect(obj)
 
     time_total = round(time.perf_counter() - time_start)

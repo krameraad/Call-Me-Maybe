@@ -1,3 +1,5 @@
+"Collection of states used for the LLM."
+
 from abc import ABC, abstractmethod
 import json
 
@@ -6,12 +8,14 @@ StateContext = dict[tuple[int], list[tuple[int]]] | list[tuple[int]]
 
 
 class Expect(ABC):
+    'Base class for states assisting constrained decoding.'
     def __init__(self, context: StateContext):
         super().__init__()
         self.context = context
         self.tokens: list[int] = []
 
-    def valid_tokens(self, options: tuple[tuple[int]]) -> set:
+    def _valid_tokens(self, options: tuple[tuple[int]]) -> set:
+        "Return set of tokens that are available for LLM to use."
         result = set()
 
         if not self.tokens:
@@ -33,46 +37,53 @@ class Expect(ABC):
 
     @abstractmethod
     def get_allowed(self) -> set:
+        'Access valid tokens from the state.'
         raise NotImplementedError()
 
     @abstractmethod
     def next_state(self) -> "Expect":
+        'Return the next state.'
         raise NotImplementedError()
 
 
 class ExpectEnd(Expect):
-    def get_allowed(self) -> set:  # "}}\n
-        return self.valid_tokens(((95642,),))
+    'Final token of the LLM response: `"}}\\n`'
+    def get_allowed(self) -> set:
+        return self._valid_tokens(((95642,),))
 
     def next_state(self) -> None:
         return None
 
 
 class ExpectKVSep(Expect):
-    def get_allowed(self) -> set:  # ":"
-        return self.valid_tokens(((3252,),))
+    'Separates keys from values: `":"`'
+    def get_allowed(self) -> set:
+        return self._valid_tokens(((3252,),))
 
     def next_state(self) -> "ExpectValue":
         return ExpectValue(self.context)
 
 
 class ExpectKey(Expect):
-    def get_allowed(self) -> set:  # a / b
-        return self.valid_tokens((self.context[0],))
+    'Every function has some parameters; these are the parameter names.'
+    def get_allowed(self) -> set:
+        return self._valid_tokens((self.context[0],))
 
     def next_state(self) -> ExpectKVSep:
         return ExpectKVSep(self.context[1:])
 
 
 class ExpectSep(Expect):
-    def get_allowed(self) -> set:  # ","
-        return self.valid_tokens(((2198,),))
+    'Separates key/value pairs from each other: `","`'
+    def get_allowed(self) -> set:
+        return self._valid_tokens(((2198,),))
 
     def next_state(self) -> ExpectKey:
         return ExpectKey(self.context)
 
 
 class ExpectValue(Expect):
+    "Values for parameters can be anything, as long as they're valid JSON."
     def early_exit(self, s: str) -> bool:
         try:
             json.loads(f'{{"a":"{s}"}}')
@@ -80,8 +91,8 @@ class ExpectValue(Expect):
             return True
         return False
 
-    def get_allowed(self) -> set:  # 2 / 3
-        return {-1, -2}  # Hack solution to make every token valid.
+    def get_allowed(self) -> set:
+        return {-1, -2}  # Special set to make every token valid.
 
     def next_state(self) -> ExpectEnd | ExpectSep:
         if not self.context:
@@ -90,36 +101,18 @@ class ExpectValue(Expect):
 
 
 class ExpectParameters(Expect):
-    def get_allowed(self) -> set:  # ","parameters":{"
-        return self.valid_tokens(((2198, 13786, 22317),))
+    'Insert a segment that leads into the parameters: `","parameters":{"`'
+    def get_allowed(self) -> set:
+        return self._valid_tokens(((2198, 13786, 22317),))
 
     def next_state(self) -> ExpectKey:
         return ExpectKey(self.context)
 
 
 class ExpectFunction(Expect):
-    def get_allowed(self) -> set:  # fn_add_numbers
-        return self.valid_tokens(tuple(self.context.keys()))
+    'Select a function name.'
+    def get_allowed(self) -> set:
+        return self._valid_tokens(tuple(self.context.keys()))
 
     def next_state(self) -> ExpectParameters:
         return ExpectParameters(self.context.get(tuple(self.tokens)))
-
-
-# EXAMPLE
-
-# {"prompt":"What is the sum of 265 and 345?","name":"fn_add_numbers
-# ","parameters":{"a":"265","b":"345"}}
-
-# STRINGS TO TOKENS:
-
-# ","parameters":{"
-# [2198, 13786, 22317]
-
-# ":"
-# [3252]
-
-# ","
-# [2198]
-
-# "}}\n
-# [95642]

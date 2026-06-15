@@ -34,7 +34,7 @@ class LLMInterface:
         }
         "Dictionary of functions and their parameters, encoded as int tuples."
 
-    def add_token(
+    def _add_token(
             self,
             output: list[int],
             state_tokens: list[int],
@@ -57,7 +57,7 @@ class LLMInterface:
         "Neatly print the tokens making up a string."
         print(f"""{D + "─" * 9}┬{"─" * 30 + X}
 {H}Token{X}    {D}│{X} {H}String{X}
-{D + "─" * 9}┴{"─" * 30 + X}""")
+{D + "─" * 9}┼{"─" * 30 + X}""")
         for token in self.get_tokens(s):
             print(f"{token:>8} {D}│{X} {self.vocab[token]}")
         print(f"{D + "─" * 9}┴{"─" * 30 + X}")
@@ -66,19 +66,17 @@ class LLMInterface:
     def dump(obj: str, path: Path) -> None:
         """Dump `obj` as a JSON string into the file pointed to by `path`.
         Appends the object to a JSON array if one is present in the file."""
+        function_calls = [json.loads(obj)]
         path.parent.mkdir(exist_ok=True)
-        if path.exists():
-            function_calls = json.loads(path.read_text())
-            if not isinstance(function_calls, list):
-                function_calls = []
-        else:
-            function_calls = []
-        function_calls += [json.loads(obj)]
+        try:
+            function_calls = json.loads(path.read_text()) + function_calls
+        except (json.JSONDecodeError, TypeError):
+            pass
         with path.open('w') as f:
             json.dump(function_calls, f, indent='\t')
 
-    def process_prompt(self, prompt: str, limit: int = 100) -> str:
-        """Generate up to `limit` tokens, completing `prompt`.
+    def process_prompt(self, prompt: str, timeout: float = 30.0) -> str:
+        """Try to complete `prompt` within `timeout` seconds.
         Returns the result decoded to a string."""
         print(f"{H + U + C}\nPrompt{X}\n{prompt}")
         time_start = time.perf_counter()
@@ -90,7 +88,7 @@ class LLMInterface:
 
         print(f"{H + U + C}Response{X}\n"
               f"{D + self.model.decode(output) + X}", end='')
-        for _ in range(limit):
+        while time.perf_counter() - time_start < timeout:
             allowed = state.get_allowed()
             if not allowed:
                 state = state.next_state()
@@ -99,7 +97,7 @@ class LLMInterface:
                 continue
             if len(allowed) == 1:
                 next_token = allowed.pop()
-                self.add_token(output, state.tokens, next_token, True)
+                self._add_token(output, state.tokens, next_token, True)
                 continue
 
             logits = self.model.get_logits_from_input_ids(context + output)
@@ -115,9 +113,9 @@ class LLMInterface:
                 if not state:
                     break
                 continue
-            self.add_token(output, state.tokens, next_token, False)
+            self._add_token(output, state.tokens, next_token, False)
         else:
-            raise RuntimeError(f"Token limit ({limit}) reached.")
+            raise RuntimeError(f"Time limit ({timeout}) reached.")
 
         print(
             f"\n{H}Response finished in "
