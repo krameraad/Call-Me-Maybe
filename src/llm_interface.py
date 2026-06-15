@@ -9,13 +9,16 @@ from .formatting import X, H, U, C, D
 
 
 class LLMInterface:
+    """Interface class to assist in interacting with an LLM."""
     def __init__(self, defs: str):
         self.model = Small_LLM_Model()
-        self.vocab = list(
+        "Model retrieved from Hugging Face Hub."
+        self.vocab: list[str] = list(
             json.loads(
                 Path(self.model.get_path_to_vocab_file()).read_text()
             ).keys()
         )
+        "List of all tokens the model has in its vocabulary."
         self.context = self.get_tokens(f"""
 Example output format:
 {{"prompt": "What is the sum of 2 and 3?",\
@@ -24,12 +27,14 @@ Example output format:
 
 Available functions:
 {defs}\n""")
+        "General context used to improve results for all prompts."
         self.defs: dict[tuple[int], list[tuple[int]]] = {
             tuple(self.get_tokens(x["name"])): [
                 tuple(self.get_tokens(y)) for y in x["parameters"].keys()
             ]
             for x in json.loads(defs)
         }
+        "Dictionary of functions and their parameters, encoded as int tuples."
 
     def add_token(
             self,
@@ -38,6 +43,7 @@ Available functions:
             token: int,
             autocomplete: bool
             ) -> None:
+        "Add tokens to the output and the state's memory."
         state_tokens.append(token)
         output.append(token)
         if autocomplete:
@@ -46,12 +52,13 @@ Available functions:
             print(self.model.decode([token]), end='', flush=True)
 
     def get_tokens(self, s: str) -> list[int]:
+        "Return the tokens received from encoding as a list of integers."
         return self.model.encode(s)[0].tolist()
 
     def inspect(self, s: str) -> None:
         "Neatly print the tokens making up a string."
         print(f"{H + U}\nTokens{X}")
-        for token in self.model.encode(s)[0].tolist():
+        for token in self.get_tokens(s):
             print(f"{token:>8} | {self.vocab[token]}")
         print()
 
