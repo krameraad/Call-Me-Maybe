@@ -6,11 +6,12 @@ from llm_sdk.llm_sdk import Small_LLM_Model
 
 from .expect import ExpectFunction
 from .formatting import X, H, U, C, D
+from .types import FunctionDefinitions
 
 
 class LLMInterface:
     """Interface class to assist in interacting with an LLM."""
-    def __init__(self, defs: str):
+    def __init__(self, defs: FunctionDefinitions):
         self.model = Small_LLM_Model()
         "Model interface provided by LLM SDK."
 
@@ -21,18 +22,28 @@ class LLMInterface:
         )
         "List of all tokens the model has in its vocabulary."
 
-        defs_obj = json.loads(defs)
         self.context = self.get_tokens(f"""Available functions:
-{'\n'.join([': '.join([x['name'], x['description']]) for x in defs_obj])}""")
+{'\n'.join([': '.join([x['name'], x['description']]) for x in defs])}""")
         "General context used to improve results for all prompts."
         print(f"{H + U + C}Context{X}\n{self.model.decode(self.context)}")
-        self.defs: dict[tuple[int], list[tuple[int]]] = {
+        self.state_context: dict[tuple[int], list[tuple[int]]] = {
             tuple(self.get_tokens(x["name"])): [
                 tuple(self.get_tokens(y)) for y in x["parameters"].keys()
             ]
-            for x in defs_obj
+            for x in defs
         }
         "Dictionary of functions and their parameters, encoded as int tuples."
+
+        type_factories = {
+            "number": float,
+            "integer": int,
+            "string": str,
+            "boolean": lambda x: x.lower() in {'true', '1', 'yes'}
+        }
+        self.defs: dict[str, dict] = {x['name']: {} for x in defs}
+        for i, params in enumerate(self.defs.values()):
+            for parameter, content in defs[i]['parameters'].items():
+                params.update({parameter: type_factories[content['type']]})
 
     def _add_token(
             self,
@@ -62,15 +73,19 @@ class LLMInterface:
             print(f"{token:>8} {D}│{X} {self.vocab[token]}")
         print(f"{D + "─" * 9}┴{"─" * 30 + X}")
 
-    @staticmethod
-    def dump(obj: str, path: Path) -> None:
+    def dump(self, obj: str, path: Path) -> None:
         """Dump `obj` as a JSON string into the file pointed to by `path`.
         Appends the object to a JSON array if one is present in the file."""
         function_calls = [json.loads(obj)]
+        for call in function_calls:
+            call['parameters'] = {
+                k: self.defs[call['name']][k](v)
+                for k, v in call['parameters'].items()
+            }
         path.parent.mkdir(exist_ok=True)
         try:
             function_calls = json.loads(path.read_text()) + function_calls
-        except (json.JSONDecodeError, TypeError):
+        except (json.JSONDecodeError, OSError, TypeError):
             pass
         with path.open('w') as f:
             json.dump(function_calls, f, indent='\t')
@@ -84,15 +99,13 @@ class LLMInterface:
         context = self.context + self.get_tokens(
             f'\nPrompt: "{prompt}"\nJSON output: ')
         output = self.get_tokens(f'{{"prompt":"{prompt}","name":"')
-        state = ExpectFunction(self.defs)
+        state = ExpectFunction(self.state_context)
 
         print(f"{H + U + C}Response{X}\n"
               f"{D + self.model.decode(output) + X}", end='')
         while time.perf_counter() - time_start < timeout:
-            allowed = state.get_allowed()
-            if not allowed:
-                state = state.next_state()
-                if not state:
+            if not (allowed := state.get_allowed()):
+                if not (state := state.next_state()):
                     break
                 continue
             if len(allowed) == 1:
@@ -109,8 +122,7 @@ class LLMInterface:
             next_token = logits.index(max(logits))
             if state.early_exit(
                     self.model.decode(state.tokens + [next_token])):
-                state = state.next_state()
-                if not state:
+                if not (state := state.next_state()):
                     break
                 continue
             self._add_token(output, state.tokens, next_token, False)

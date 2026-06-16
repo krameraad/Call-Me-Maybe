@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .llm_interface import LLMInterface
 from .formatting import X, H, R
+from .types import FunctionDefinitions
 
 
 # Parse arguments.
@@ -38,8 +39,10 @@ parser.add_argument(
 
 args = parser.parse_args()
 try:
-    defs = Path(args.functions_definition).read_text()
-    tests: list[dict[str, str]] = json.loads(Path(args.input).read_text())
+    defs: FunctionDefinitions = json.loads(
+        Path(args.functions_definition).read_text())
+    tests: list[dict[str, str]] = json.loads(
+        Path(args.input).read_text())
     path_output = Path(args.output)
 except Exception:
     parser.print_help()
