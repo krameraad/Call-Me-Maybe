@@ -4,7 +4,6 @@ import time
 import sys
 from pathlib import Path
 
-from .llm_interface import LLMInterface
 from .formatting import X, H, R
 from .types import FunctionDefinitions
 
@@ -15,7 +14,7 @@ parser = argparse.ArgumentParser(
     prog='call_me_maybe',
     usage='uv run -m src '
           '[-h] [--functions_definition FUNCTIONS_DEFINITION] '
-          '[--input INPUT] [--output OUTPUT] [-i]',
+          '[--input INPUT] [--output OUTPUT] [-id]',
     description='Generating JSON using small large language models',
     epilog='Made by ekramer')
 
@@ -51,6 +50,11 @@ except Exception:
 
 # Run prompts through LLM.
 # -----------------------------------------------------------------------------
+# Import llm_interface later because it's huge;
+# we don't need to import all this just to print a help message
+from .llm_interface import LLMInterface  # noqa: E402
+
+
 interface = LLMInterface(defs)
 if args.dump:
     try:
@@ -65,7 +69,9 @@ if args.dump:
 time_start = time.perf_counter()
 for test in tests:
     try:
-        obj = interface.process_prompt(test["prompt"].replace('"', '\\"'))
+        obj = interface.process_prompt(test["prompt"]
+                                       .replace('\\', '\\\\')
+                                       .replace('"', '\\"'))
         try:
             interface.dump(obj, path_output)
         except (json.JSONDecodeError, OSError) as e:

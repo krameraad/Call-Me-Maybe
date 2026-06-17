@@ -49,16 +49,37 @@ class LLMInterface:
             self,
             output: list[int],
             state_tokens: list[int],
-            token: int,
-            autocomplete: bool
-            ) -> None:
-        "Add tokens to the output and the state's memory."
-        state_tokens.append(token)
-        output.append(token)
+            tokens: list[int],
+            autocomplete: bool = False
+            ) -> bool:
+        """Add tokens to the output and the state's memory.
+        Returns `True` if the tokens were truncated to preserve JSON format."""
+        def _valid_len(s: str) -> int:
+            "Get the length up to where a string is considered valid JSON."
+            for i in range(1, len(s) + 1):
+                try:
+                    json.loads(f'["{s[:i]}"]')
+                except json.JSONDecodeError:
+                    try:
+                        json.loads(f'["{s[:i + 1]}"]')
+                        continue
+                    except (json.JSONDecodeError, IndexError):
+                        return i - 1
+            return i
+
+        s = self.model.decode(tokens)
+        truncated_s = s
+
         if autocomplete:
-            print(f"{D + self.model.decode([token]) + X}", end='', flush=True)
+            print(f"{D + s + X}", end='', flush=True)
         else:
-            print(self.model.decode([token]), end='', flush=True)
+            truncated_s = s[:_valid_len(s)]
+            tokens = self.get_tokens(truncated_s)
+            print(truncated_s, end='', flush=True)
+
+        state_tokens.extend(tokens)
+        output.extend(tokens)
+        return s != truncated_s
 
     def get_tokens(self, s: str) -> list[int]:
         "Return the tokens received from encoding as a list of integers."
@@ -75,7 +96,8 @@ class LLMInterface:
 
     def dump(self, obj: str, path: Path) -> None:
         """Dump `obj` as a JSON string into the file pointed to by `path`.
-        Appends the object to a JSON array if one is present in the file."""
+        Appends the object to a JSON array if one is present in the file.
+        All parameters are converted to the correct types."""
         function_calls = [json.loads(obj)]
         for call in function_calls:
             call['parameters'] = {
@@ -109,8 +131,8 @@ class LLMInterface:
                     break
                 continue
             if len(allowed) == 1:
-                next_token = allowed.pop()
-                self._add_token(output, state.tokens, next_token, True)
+                next_tokens = [allowed.pop()]
+                self._add_token(output, state.tokens, next_tokens, True)
                 continue
 
             logits = self.model.get_logits_from_input_ids(context + output)
@@ -119,13 +141,10 @@ class LLMInterface:
                     if i not in allowed:
                         logits[i] = float('-inf')
 
-            next_token = logits.index(max(logits))
-            if state.early_exit(
-                    self.model.decode(state.tokens + [next_token])):
+            next_tokens = [logits.index(max(logits))]
+            if self._add_token(output, state.tokens, next_tokens):
                 if not (state := state.next_state()):
                     break
-                continue
-            self._add_token(output, state.tokens, next_token, False)
         else:
             raise RuntimeError(f"Time limit ({timeout}) reached.")
 

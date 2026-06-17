@@ -1,3 +1,6 @@
+"Demonstrate autocompletion in a simple environment."
+
+
 class Autocomplete:
     def __init__(self, functions: list[list[int]]):
         self.functions = functions
