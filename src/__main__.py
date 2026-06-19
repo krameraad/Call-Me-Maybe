@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from .formatting import X, H, R
-from .types import FunctionDefinitions
+from .function_definition import FunctionDefinition
 
 
 # Parse arguments.
@@ -38,7 +38,7 @@ parser.add_argument(
 
 args = parser.parse_args()
 try:
-    defs: FunctionDefinitions = json.loads(
+    defs: list[FunctionDefinition] = json.loads(
         Path(args.functions_definition).read_text())
     tests: list[dict[str, str]] = json.loads(
         Path(args.input).read_text())

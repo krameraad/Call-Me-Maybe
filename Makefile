@@ -35,7 +35,7 @@ clean:
 	rm -rf .mypy_cache
 
 lint: install
-	uv run flake8 --exclude=.venv
+	uv run flake8 --exclude=.venv,llm_sdk
 	uv run mypy . \
 		--warn-return-any \
 		--warn-unused-ignores \
@@ -43,13 +43,13 @@ lint: install
 		--disallow-untyped-defs \
 		--check-untyped-defs \
 		--explicit-package-bases \
-		--exclude '^(venv|\.venv|env)/'
+		--exclude '^(venv|\.venv|env|llm_sdk)/'
 
 lint-strict: install
-	uv run flake8 --exclude=.venv
+	uv run flake8 --exclude=.venv,llm_sdk
 	uv run mypy . \
 		--strict \
 		--explicit-package-bases \
-		--exclude '^(venv|\.venv|env)/'
+		--exclude '^(venv|\.venv|env|llm_sdk)/'
 
 .PHONY: install run debug clean lint lint-strict

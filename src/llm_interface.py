@@ -1,17 +1,18 @@
 import time
 import json
 from pathlib import Path
+from typing import Any
 
 from llm_sdk.llm_sdk import Small_LLM_Model
 
-from .expect import ExpectFunction
+from .expect import Expect, ExpectFunction
 from .formatting import X, H, U, C, D
-from .types import FunctionDefinitions
+from .function_definition import FunctionDefinition
 
 
 class LLMInterface:
     """Interface class to assist in interacting with an LLM."""
-    def __init__(self, defs: FunctionDefinitions):
+    def __init__(self, defs: list[FunctionDefinition]):
         self.model = Small_LLM_Model()
         "Model interface provided by LLM SDK."
 
@@ -26,7 +27,7 @@ class LLMInterface:
 {'\n'.join([': '.join([x['name'], x['description']]) for x in defs])}""")
         "General context used to improve results for all prompts."
         print(f"{H + U + C}Context{X}\n{self.model.decode(self.context)}")
-        self.state_context: dict[tuple[int], list[tuple[int]]] = {
+        self.state_context: dict[tuple[int, ...], list[tuple[int, ...]]] = {
             tuple(self.get_tokens(x["name"])): [
                 tuple(self.get_tokens(y)) for y in x["parameters"].keys()
             ]
@@ -40,7 +41,8 @@ class LLMInterface:
             "string": str,
             "boolean": lambda x: x.lower() in {'true', '1', 'yes'}
         }
-        self.defs: dict[str, dict] = {x['name']: {} for x in defs}
+        self.defs: dict[str, dict[str, Any]] = {x['name']: {} for x in defs}
+        "Functions and their corresponding parameters, along with their types."
         for i, params in enumerate(self.defs.values()):
             for parameter, content in defs[i]['parameters'].items():
                 params.update({parameter: type_factories[content['type']]})
@@ -121,14 +123,15 @@ class LLMInterface:
         context = self.context + self.get_tokens(
             f'\nPrompt: "{prompt}"\nJSON output: ')
         output = self.get_tokens(f'{{"prompt":"{prompt}","name":"')
-        state = ExpectFunction(self.state_context)
+        state: Expect | None = ExpectFunction(self.state_context)
 
         print(f"{H + U + C}Response{X}\n"
               f"{D + self.model.decode(output) + X}", end='')
         while time.perf_counter() - time_start < timeout:
+            if state is None:
+                break
             if not (allowed := state.get_allowed()):
-                if not (state := state.next_state()):
-                    break
+                state = state.next_state()
                 continue
             if len(allowed) == 1:
                 next_tokens = [allowed.pop()]
@@ -143,8 +146,7 @@ class LLMInterface:
 
             next_tokens = [logits.index(max(logits))]
             if self._add_token(output, state.tokens, next_tokens):
-                if not (state := state.next_state()):
-                    break
+                state = state.next_state()
         else:
             raise RuntimeError(f"Time limit ({timeout}) reached.")
 

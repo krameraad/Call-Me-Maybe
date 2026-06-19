@@ -6,7 +6,7 @@ class Autocomplete:
         self.functions = functions
         self.tokens: list[int] = []
 
-    def valid_tokens(self) -> set:
+    def valid_tokens(self) -> set[int]:
         result = set()
 
         if not self.tokens:
