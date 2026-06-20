@@ -4,8 +4,10 @@ import time
 import sys
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from .formatting import X, H, R
-from .function_definition import FunctionDefinition
+from .models import FunctionDefinition
 
 
 # Parse arguments.
@@ -38,12 +40,19 @@ parser.add_argument(
 
 args = parser.parse_args()
 try:
-    defs: list[FunctionDefinition] = json.loads(
-        Path(args.functions_definition).read_text())
-    tests: list[dict[str, str]] = json.loads(
-        Path(args.input).read_text())
+    obj = json.loads(Path(args.functions_definition).read_text())
+    if not isinstance(obj, list):
+        raise TypeError("Function definitions must be a JSON list.")
+    defs = [FunctionDefinition(**x) for x in obj]
+
+    obj = json.loads(Path(args.input).read_text())
+    if not isinstance(obj, list):
+        raise TypeError("Tests must be a JSON list.")
+    tests = [str(x["prompt"]) for x in obj]
+
     path_output = Path(args.output)
-except Exception:
+except Exception as e:
+    print(H + R + f'Error while loading program: {e}' + X, file=sys.stderr)
     parser.print_help()
     sys.exit(1)
 
@@ -69,18 +78,20 @@ if args.dump:
 time_start = time.perf_counter()
 for test in tests:
     try:
-        obj = interface.process_prompt(test["prompt"]
-                                       .replace('\\', '\\\\')
-                                       .replace('"', '\\"'))
+        obj = interface.process_prompt(
+            test.replace('\\', '\\\\').replace('"', '\\"'))
         try:
             interface.dump(obj, path_output)
-        except (json.JSONDecodeError, OSError) as e:
-            print(H + R + f'\nError: {e}' + X, file=sys.stderr)
+        except (json.JSONDecodeError, OSError, ValidationError) as e:
+            print(H + R + f'\nError while dumping output: {e}' + X,
+                  file=sys.stderr)
     except RuntimeError as e:
-        print(H + R + f'\nError: {e}' + X, file=sys.stderr)
+        obj = None
+        print(H + R + f'\nError while processing prompt: {e}' + X,
+              file=sys.stderr)
     except KeyboardInterrupt:
         sys.exit(1)
-    if args.inspect:
+    if args.inspect and obj is not None:
         interface.inspect(obj)
 
     time_total = round(time.perf_counter() - time_start)
