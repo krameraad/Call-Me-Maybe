@@ -108,3 +108,5 @@ It prints a list of the generated tokens and the strings they represent.
 
 ## Example usage
 See for yourself.
+
+https://github.com/user-attachments/assets/16c2a02a-2bf3-4504-be6a-216ac5b1b3be
