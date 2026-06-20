@@ -26,15 +26,12 @@ Example:
 ```
 
 ## Resources
-Our interaction with the LLM goes through a wrapper from our school,
-creatively named *llm_sdk*.
-We are not allowed to use any AI-related packages besides this.
-This means a lot of AI-related resources online weren't very relevant.
-Also, tutorials on various AI concepts were at a scientific level.
-This is why I couldn't find many good resources.
-Other students and AI where therefore much more helpful in guiding me.
+This program works with one of several models:
+- [Qwen/Qwen3-0.6B](https://huggingface.co/Qwen/Qwen3-0.6B) (default)
+- [Qwen/Qwen1.5-0.5B](https://huggingface.co/Qwen/Qwen1.5-0.5B)
+- [allenai/OLMo-2-0425-1B](https://huggingface.co/allenai/OLMo-2-0425-1B)
 
-Nonetheless,
+Also,
 [this tutorial on tokenization](https://huggingface.co/learn/llm-course/chapter6/5)
 was helpful to understand the link between characters and tokens.
 
@@ -86,3 +83,28 @@ improvements during testing.
 Reliability is near 100%: even argument selection is 100% for included tests.
 
 ## Challenges faced
+The hard part was understanding the concepts behind LLMs.
+Most online resources were too advanced,
+and my fellow students couldn't really help me too much.
+I am grateful for their attempts, though.
+Small hints to nudge me in the right direction
+got me looking into the LLM's vocabulary.
+This vocabulary was what I needed to start seeing
+the link between tokens and strings, and then understand the logits.
+
+Once I got into it, I didn't have any difficulties finishing it.
+
+## Testing strategy
+Visualizing an algorithm is one of the best ways to make it understandable.
+As with *Fly-in*, I made sure to make visualizations as soon as possible.
+For *call me maybe*, the process prints the LLM's choices as they are made.
+
+Not only that, but with autocompletion working, the distinction between
+autocompleted and normal tokens should be easily visible.
+
+Finally, to get a better understanding of the back-and-forth of
+encoding and decoding, I decided to make an inspection function.
+It prints a list of the generated tokens and the strings they represent.
+
+## Example usage
+See for yourself.

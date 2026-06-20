@@ -8,6 +8,15 @@ class FunctionDefinition(BaseModel):
     returns: dict[str, str]
 
 
+class StateContext(BaseModel):
+    functions: dict[str, dict[str, str]]
+    parameters: list[tuple[int, ...]] = []
+    param_def: tuple[int, ...]  # ","parameters":{"
+    kvsep: tuple[int, ...]  # ":"
+    sep: tuple[int, ...]  # ","
+    end: tuple[int, ...]  # "}}\n
+
+
 class FunctionCall(BaseModel):
     prompt: str
     name: str
