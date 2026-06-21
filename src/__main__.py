@@ -7,7 +7,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from .formatting import X, H, R
-from .models import FunctionDefinition
+from .data_models import FunctionDefinition
 
 
 # Parse arguments.
@@ -15,43 +15,62 @@ from .models import FunctionDefinition
 parser = argparse.ArgumentParser(
     prog='call_me_maybe',
     usage='uv run -m src '
-          '[-h] [--functions_definition FUNCTIONS_DEFINITION] '
-          '[--input INPUT] [--output OUTPUT] [-id]',
+          '[-h] [-f FUNCTIONS_DEFINITION] '
+          '[-i INPUT] [-o OUTPUT] [-d DUMP] [-e]',
     description='Generating JSON using small large language models',
     epilog='Made by ekramer')
 
 parser.add_argument(
-    '--functions_definition',
+    '-f', '--functions_definition',
     help='JSON file with definitions for functions to be called')
 parser.add_argument(
-    '--input',
+    '-i', '--input',
     help='JSON file to read prompts from')
 parser.add_argument(
-    '--output',
+    '-o', '--output',
     help='file to dump generated JSON objects in')
 parser.add_argument(
-    '-i', '--inspect',
-    action='store_true',
-    help='print token information for prompt results')
+    '-m', '--model',
+    help='LLM to download and use from Hugging Face')
 parser.add_argument(
     '-d', '--dump',
+    help='path to dump vocabulary of the model')
+parser.add_argument(
+    '-e', '--examine',
     action='store_true',
-    help='dump vocabulary of the model')
+    help='print token information for prompt results')
 
 args = parser.parse_args()
+model = args.model if args.model else "Qwen/Qwen3-0.6B"
+defs = []
 try:
-    obj = json.loads(Path(args.functions_definition).read_text())
-    if not isinstance(obj, list):
-        raise TypeError("Function definitions must be a JSON list.")
-    defs = [FunctionDefinition(**x) for x in obj]
+    if args.dump:
+        try:
+            path_dump = Path(args.dump)
+        except (OSError, TypeError):
+            raise OSError("Invalid dump path.")
+    else:
+        try:
+            obj = json.loads(Path(args.functions_definition).read_text())
+        except (OSError, TypeError):
+            raise OSError("Invalid function definition path.")
+        if not isinstance(obj, list):
+            raise TypeError("Function definitions must be a JSON list.")
+        defs = [FunctionDefinition(**x) for x in obj]
 
-    obj = json.loads(Path(args.input).read_text())
-    if not isinstance(obj, list):
-        raise TypeError("Tests must be a JSON list.")
-    tests = [str(x["prompt"]) for x in obj]
+        try:
+            obj = json.loads(Path(args.input).read_text())
+        except (OSError, TypeError):
+            raise OSError("Invalid input path.")
+        if not isinstance(obj, list):
+            raise TypeError("Tests must be a JSON list.")
+        tests = [str(x["prompt"]) for x in obj]
 
-    path_output = Path(args.output)
-except Exception as e:
+        try:
+            path_output = Path(args.output)
+        except (OSError, TypeError):
+            raise OSError("Invalid output path.")
+except (OSError, TypeError) as e:
     print(H + R + f'Error while loading program: {e}' + X, file=sys.stderr)
     parser.print_help()
     sys.exit(1)
@@ -63,17 +82,23 @@ except Exception as e:
 # we don't need to import all this just to print a help message
 from .llm_interface import LLMInterface  # noqa: E402
 
+try:
+    interface = LLMInterface(model, defs)
+except Exception as e:
+    print(H + R + f'Error while initializing LLM: {e}' + X, file=sys.stderr)
+    sys.exit(1)
 
-interface = LLMInterface(defs)
 if args.dump:
     try:
-        with (path_output.parent / 'vocab.txt').open('w') as f:
+        with path_dump.open('w') as f:
             for i, token in enumerate(interface.vocab):
-                f.write(f'{i:>8} {token}\n')
+                f.write(f'{i:>16} {token}\n')
         print(f"{H}Successfully dumped model vocabulary.{X}\n")
+        sys.exit(0)
     except OSError as e:
         print(H + R + f'Error while dumping vocabulary: {e}' + X,
               file=sys.stderr)
+        sys.exit(1)
 
 time_start = time.perf_counter()
 for test in tests:
@@ -91,7 +116,7 @@ for test in tests:
               file=sys.stderr)
     except KeyboardInterrupt:
         sys.exit(1)
-    if args.inspect and obj is not None:
+    if args.examine and obj is not None:
         interface.inspect(obj)
 
     time_total = round(time.perf_counter() - time_start)

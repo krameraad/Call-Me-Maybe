@@ -7,43 +7,48 @@ from llm_sdk.llm_sdk import Small_LLM_Model
 
 from .expect import Expect, ExpectFunction
 from .formatting import X, H, U, C, D
-from .models import FunctionDefinition, FunctionCall
+from .data_models import FunctionDefinition, StateContext, FunctionCall
 
 
 class LLMInterface:
     """Interface class to assist in interacting with an LLM.
     `defs` is the functions defined for the LLM to use."""
-    def __init__(self, defs: list[FunctionDefinition]):
-        self.model = Small_LLM_Model()
+    def __init__(self, model_name: str, defs: list[FunctionDefinition]):
+        print(f"{H + U + C}Current model{X}: {H + model_name + X}\n")
+        self.model = Small_LLM_Model(model_name)
         "Model interface provided by LLM SDK."
 
         self.vocab: list[str] = list(
             json.loads(
                 Path(self.model.get_path_to_vocab_file()).read_text()
-            ).keys()
-        )
+            ).keys())
         "List of all tokens the model has in its vocabulary."
 
         self.context = self.get_tokens(f"""Available functions:
 {'\n'.join([': '.join([x.name, x.description]) for x in defs])}""")
         "General context used to improve results for all prompts."
-        print(f"{H + U + C}Context{X}\n{self.model.decode(self.context)}")
-        self.state_context: dict[tuple[int, ...], list[tuple[int, ...]]] = {
-            tuple(self.get_tokens(x.name)): [
-                tuple(self.get_tokens(y)) for y in x.parameters.keys()
-            ]
-            for x in defs
-        }
+        if defs:
+            print(f"{H + U + C}Context{X}\n{self.model.decode(self.context)}")
+
+        self.state_context = StateContext(
+            functions={
+                tuple(self.get_tokens(x.name)): [
+                    tuple(self.get_tokens(y)) for y in x.parameters.keys()]
+                for x in defs},
+            param_def=tuple(self.get_tokens('","parameters":{"')),
+            kvsep=tuple(self.get_tokens('":"')),
+            sep=tuple(self.get_tokens('","')),
+            end=tuple(self.get_tokens('"}}\n')),)
         "Dictionary of functions and their parameters, encoded as int tuples."
 
         type_factories = {
             "number": float,
             "integer": int,
-            "boolean": lambda x: x.lower() in {'true', '1', 'yes'}
-        }
-        self.defs: dict[str, dict[str, Any]] = {x.name: {} for x in defs}
+            "boolean": lambda x: x.lower() in {'true', '1', 'yes'}}
+        self.conversions: dict[str, dict[str, Any]] = {
+            x.name: {} for x in defs}
         "Functions and their corresponding parameters, along with their types."
-        for i, params in enumerate(self.defs.values()):
+        for i, params in enumerate(self.conversions.values()):
             for parameter, content in defs[i].parameters.items():
                 params.update(
                     {parameter: type_factories.get(content['type'], str)})
@@ -136,7 +141,7 @@ class LLMInterface:
         """
         new_call = FunctionCall(**json.loads(obj))
         converted_params = {
-            k: self.defs[new_call.name][k](v)
+            k: self.conversions[new_call.name][k](v)
             for k, v in new_call.parameters.items()
         }
         function_calls = [{

@@ -9,7 +9,7 @@ class FunctionDefinition(BaseModel):
 
 
 class StateContext(BaseModel):
-    functions: dict[str, dict[str, str]]
+    functions: dict[tuple[int, ...], list[tuple[int, ...]]]
     parameters: list[tuple[int, ...]] = []
     param_def: tuple[int, ...]  # ","parameters":{"
     kvsep: tuple[int, ...]  # ":"

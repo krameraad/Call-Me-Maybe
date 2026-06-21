@@ -1,17 +1,18 @@
 "Collection of states used for the LLM."
 
 from abc import ABC, abstractmethod
-from typing import Any
+
+from .data_models import StateContext
 
 
 class Expect(ABC):
     'Base class for states assisting constrained decoding.'
-    def __init__(self, context: Any):
+    def __init__(self, context: StateContext):
         super().__init__()
         self.context = context
         self.tokens: list[int] = []
 
-    def _valid_tokens(self, options: tuple[tuple[int, ...]]) -> set[int]:
+    def _valid_tokens(self, options: tuple[tuple[int, ...], ...]) -> set[int]:
         "Return set of tokens that are available for LLM to use."
         result: set[int] = set()
 
@@ -41,7 +42,7 @@ class Expect(ABC):
 class ExpectEnd(Expect):
     'Final token of the LLM response: `"}}\\n`'
     def get_allowed(self) -> set[int]:
-        return self._valid_tokens(((95642,),))
+        return self._valid_tokens((self.context.end,))
 
     def next_state(self) -> None:
         return None
@@ -50,7 +51,7 @@ class ExpectEnd(Expect):
 class ExpectKVSep(Expect):
     'Separates keys from values: `":"`'
     def get_allowed(self) -> set[int]:
-        return self._valid_tokens(((3252,),))
+        return self._valid_tokens((self.context.kvsep,))
 
     def next_state(self) -> Expect:
         return ExpectValue(self.context)
@@ -59,16 +60,17 @@ class ExpectKVSep(Expect):
 class ExpectKey(Expect):
     'Every function has some parameters; these are the parameter names.'
     def get_allowed(self) -> set[int]:
-        return self._valid_tokens((self.context[0],))
+        return self._valid_tokens((self.context.parameters[0],))
 
     def next_state(self) -> Expect:
-        return ExpectKVSep(self.context[1:])
+        self.context.parameters.pop(0)
+        return ExpectKVSep(self.context)
 
 
 class ExpectSep(Expect):
     'Separates key/value pairs from each other: `","`'
     def get_allowed(self) -> set[int]:
-        return self._valid_tokens(((2198,),))
+        return self._valid_tokens((self.context.sep,))
 
     def next_state(self) -> Expect:
         return ExpectKey(self.context)
@@ -80,7 +82,7 @@ class ExpectValue(Expect):
         return {-1, -2}  # Special set to make every token valid.
 
     def next_state(self) -> Expect:
-        if not self.context:
+        if not self.context.parameters:
             return ExpectEnd(self.context)
         return ExpectSep(self.context)
 
@@ -88,7 +90,7 @@ class ExpectValue(Expect):
 class ExpectParameters(Expect):
     'Insert a segment that leads into the parameters: `","parameters":{"`'
     def get_allowed(self) -> set[int]:
-        return self._valid_tokens(((2198, 13786, 22317),))
+        return self._valid_tokens((self.context.param_def,))
 
     def next_state(self) -> Expect:
         return ExpectKey(self.context)
@@ -97,7 +99,9 @@ class ExpectParameters(Expect):
 class ExpectFunction(Expect):
     'Select a function name.'
     def get_allowed(self) -> set[int]:
-        return self._valid_tokens(tuple(self.context.keys()))
+        return self._valid_tokens(tuple(self.context.functions.keys()))
 
     def next_state(self) -> Expect:
-        return ExpectParameters(self.context.get(tuple(self.tokens)))
+        self.context.parameters = \
+            self.context.functions[tuple(self.tokens)].copy()
+        return ExpectParameters(self.context)

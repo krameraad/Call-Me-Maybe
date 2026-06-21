@@ -13,26 +13,43 @@ Output is generated in `data/output/function_calls.json`.
 
 To customize the input, you can create your own function definitions and tests
 and provide the paths to them when running using `uv run -m src ...`.
-When running directly, you can also specify `-i` and `-d` arguments,
-which show an inspection of the tokens generated
+When running directly, you can also specify `-e` and `-d` arguments,
+which show an examination of the tokens generated
 and dump the model's vocabulary in a text file, respectively.
 
-Example:
+The `-m MODEL` argument allows selecting a model.
+The `llm_sdk` handles downloading and interacting with LLMs,
+and it does so using *Hugging Face Hub*.
+To use a model from the platform, you need to supply its name.
+The **resources** section has some examples.
+
+Examples:
 ```bash
 	uv run python -m src \
-		--functions_definition data/input/custom_functions_definition.json \
-		--input data/input/custom_function_calling_tests.json \
-		--output data/output/function_calls.json
+		-f data/input/custom_functions_definition.json \
+		-i data/input/custom_function_calling_tests.json \
+		-o data/output/function_calls.json
+```
+```bash
+	uv run python -m src -d data/output/vocab.txt
+```
+```bash
+	uv run python -m src \
+		-f data/input/functions_definition.json \
+		-i data/input/function_calling_tests.json \
+		-o data/output/function_calls.json \
+		-m Qwen/Qwen1.5-0.5B -e
 ```
 
 ## Resources
-This program works with one of several models:
+This program works with several models, for example:
 - [Qwen/Qwen3-0.6B](https://huggingface.co/Qwen/Qwen3-0.6B) (default)
 - [Qwen/Qwen1.5-0.5B](https://huggingface.co/Qwen/Qwen1.5-0.5B)
 - [allenai/OLMo-2-0425-1B](https://huggingface.co/allenai/OLMo-2-0425-1B)
 
-Also,
-[this tutorial on tokenization](https://huggingface.co/learn/llm-course/chapter6/5)
+Keep in mind that not all models are compatible with the `llm_sdk`.
+
+[This tutorial on tokenization](https://huggingface.co/learn/llm-course/chapter6/5)
 was helpful to understand the link between characters and tokens.
 
 ## Algorithm
@@ -52,7 +69,7 @@ the next token from the option is added to a set of valid tokens.
 Each option adds one or no tokens to the set. If the set turns out empty,
 we're done with the segment of JSON to generate, and move on to the next.
 Each segment is represented by a state, managed by a state machine.
-A "None" state means the output is finished.
+A `None` state means the output is finished.
 
 ## Design decisions
 Besides constrained decoding,
