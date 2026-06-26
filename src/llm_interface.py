@@ -2,10 +2,11 @@ import time
 import json
 from pathlib import Path
 from typing import Any
+from pprint import pprint
 
 from llm_sdk.llm_sdk import Small_LLM_Model
 
-from .expect import Expect, ExpectFunction
+from .expect import Expect, ExpectFunction, ExpectValue
 from .formatting import X, H, U, C, D
 from .data_models import FunctionDefinition, StateContext, FunctionCall
 
@@ -32,19 +33,31 @@ class LLMInterface:
 
         self.state_context = StateContext(
             functions={
-                tuple(self.get_tokens(x.name)): [
-                    tuple(self.get_tokens(y)) for y in x.parameters.keys()]
+                tuple(self.get_tokens(x.name) + self.get_tokens('","')): [
+                    tuple(self.get_tokens(y))
+                    for y in x.parameters.keys()]
                 for x in defs},
-            param_def=tuple(self.get_tokens('","parameters":{"')),
+            param_def=tuple(self.get_tokens('parameters":{"')),
             kvsep=tuple(self.get_tokens('":"')),
             sep=tuple(self.get_tokens('","')),
             end=tuple(self.get_tokens('"}}\n')),)
         "Dictionary of functions and their parameters, encoded as int tuples."
 
+        def convert_array(s: str) -> list[Any]:
+            "Convert a string into a list, with some leeway in the syntax."
+            s = s.strip()
+            if s.startswith("[") and s.endswith(']'):
+                s = s.removeprefix('[').removesuffix(']')
+            elif s.startswith("(") and s.endswith(')'):
+                s = s.removeprefix('(').removesuffix(')')
+            return json.loads('[' + s + ']')
+
         type_factories = {
             "number": float,
             "integer": int,
-            "boolean": lambda x: x.lower() in {'true', '1', 'yes'}}
+            "boolean": lambda x: x.lower() in {'true', '1', 'yes', 'y', 'on'},
+            "array": convert_array,
+            "object": json.loads}
         self.conversions: dict[str, dict[str, Any]] = {
             x.name: {} for x in defs}
         "Functions and their corresponding parameters, along with their types."
@@ -56,7 +69,7 @@ class LLMInterface:
     def _add_token(
             self,
             output: list[int],
-            state_tokens: list[int],
+            state: Expect,
             tokens: list[int],
             autocomplete: bool = False
             ) -> bool:
@@ -72,14 +85,14 @@ class LLMInterface:
             List of tokens to add.
         autocomplete : bool, optional
             Whether the token added was as a result of autocompletion,
-            by default `False`
+            by default `False`.
 
         Returns
         -------
         bool
             `True` if the token was truncated to preserve JSON format.
         """
-        def _valid_len(s: str) -> int:
+        def valid_len(s: str) -> int:
             "Get the length up to where a string is considered valid JSON."
             for i in range(1, len(s) + 1):
                 try:
@@ -97,12 +110,14 @@ class LLMInterface:
 
         if autocomplete:
             print(f"{D + s + X}", end='', flush=True)
-        else:
-            truncated_s = s[:_valid_len(s)]
+        elif isinstance(state, ExpectValue):
+            truncated_s = s[:valid_len(s)]
             tokens = self.get_tokens(truncated_s)
             print(truncated_s, end='', flush=True)
+        else:
+            print(s, end='', flush=True)
 
-        state_tokens.extend(tokens)
+        state.tokens.extend(tokens)
         output.extend(tokens)
         return s != truncated_s
 
@@ -119,14 +134,14 @@ class LLMInterface:
             print(f"{token:>8} {D}│{X} {self.vocab[token]}")
         print(f"{D + "─" * 9}┴{"─" * 30 + X}")
 
-    def dump(self, obj: str, path: Path) -> None:
+    def dump(self, s: str, path: Path) -> None:
         """Dump a JSON string into a file according to a specification.
         Appends the object to a JSON array if one is present in the file.
         All parameters are converted to the correct types.
 
         Parameters
         ----------
-        obj : str
+        s : str
             Object to load as JSON. This is the output of the LLM,
             and represents a single function call.
         path : Path
@@ -135,15 +150,19 @@ class LLMInterface:
         Raises
         ------
         JSONDecodeError
-            `obj` is not in a valid function call format.
+            `s` is not in a valid function call format.
         OSError:
             Something goes wrong during file handling.
         """
-        new_call = FunctionCall(**json.loads(obj))
-        converted_params = {
-            k: self.conversions[new_call.name][k](v)
-            for k, v in new_call.parameters.items()
-        }
+        new_call = FunctionCall(**json.loads(s))
+        converted_params = {}
+        for k, v in new_call.parameters.items():
+            try:
+                converted_params.update(
+                    {k: self.conversions[new_call.name][k](v)})
+            except ValueError:
+                converted_params.update(
+                    {k: v})
         function_calls = [{
             "prompt": new_call.prompt,
             "name": new_call.name,
@@ -157,7 +176,12 @@ class LLMInterface:
         with path.open('w') as f:
             json.dump(function_calls, f, indent='\t')
 
-    def process_prompt(self, prompt: str, timeout: float = 30.0) -> str:
+    def process_prompt(
+            self,
+            prompt: str,
+            timeout: float = 30.0,
+            examine: bool = False
+            ) -> str:
         """Generate a string representing a function call, based on a prompt.
 
         Parameters
@@ -167,6 +191,9 @@ class LLMInterface:
         timeout : float, optional
             When to prematurely terminate the response, in seconds,
             by default `30.0`
+        examine : bool, optional
+            Whether to inspect the output,
+            by default `False`
 
         Returns
         -------
@@ -195,8 +222,7 @@ class LLMInterface:
                 state = state.next_state()
                 continue
             if len(allowed) == 1:
-                next_tokens = [allowed.pop()]
-                self._add_token(output, state.tokens, next_tokens, True)
+                self._add_token(output, state, [allowed.pop()], True)
                 continue
 
             logits = self.model.get_logits_from_input_ids(context + output)
@@ -205,14 +231,15 @@ class LLMInterface:
                     if i not in allowed:
                         logits[i] = float('-inf')
 
-            next_tokens = [logits.index(max(logits))]
-            if self._add_token(output, state.tokens, next_tokens):
+            if self._add_token(output, state, [logits.index(max(logits))]):
                 state = state.next_state()
         else:
             raise RuntimeError(f"Time limit ({timeout}) reached.")
 
-        print(
-            f"\n{H}Response finished in "
-            f"{round(time.perf_counter() - time_start)} seconds.{X}")
+        print(f"\n{H}Response finished in "
+              f"{round(time.perf_counter() - time_start)} seconds.{X}")
 
-        return self.model.decode(output)
+        result = self.model.decode(output)
+        if examine:
+            self.inspect(result)
+        return result

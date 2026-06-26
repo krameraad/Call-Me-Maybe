@@ -23,6 +23,12 @@ and it does so using *Hugging Face Hub*.
 To use a model from the platform, you need to supply its name.
 The **resources** section has some examples.
 
+Each prompt must be completed within a time limit.
+The prompt is cancelled, and the program moves to the next one,
+if the time limit is exceeded.
+By default, this limit is 30 seconds.
+Provide a different time limit with the `-t` argument.
+
 Examples:
 ```bash
 	uv run python -m src \
@@ -42,15 +48,22 @@ Examples:
 ```
 
 ## Resources
+[Hugging Face](https://huggingface.co/)
+was maybe one of the most useful resources I found.
+It has guides, and all sorts of useful information on LLMs.
+Models can be browsed on *Hugging Face*, too.
+[This tutorial on tokenization](https://huggingface.co/learn/llm-course/chapter6/5)
+was helpful to understand the link between characters and tokens.
+
 This program works with several models, for example:
 - [Qwen/Qwen3-0.6B](https://huggingface.co/Qwen/Qwen3-0.6B) (default)
 - [Qwen/Qwen1.5-0.5B](https://huggingface.co/Qwen/Qwen1.5-0.5B)
 - [allenai/OLMo-2-0425-1B](https://huggingface.co/allenai/OLMo-2-0425-1B)
+- [HuggingFaceTB/SmolLM-360M](https://huggingface.co/HuggingFaceTB/SmolLM-360M)
+- [HuggingFaceTB/SmolLM2-1.7B](https://huggingface.co/HuggingFaceTB/SmolLM-360M)
 
 Keep in mind that not all models are compatible with the `llm_sdk`.
 
-[This tutorial on tokenization](https://huggingface.co/learn/llm-course/chapter6/5)
-was helpful to understand the link between characters and tokens.
 
 ## Algorithm
 Constrained decoding is very similar to deduction.
@@ -122,6 +135,8 @@ autocompleted and normal tokens should be easily visible.
 Finally, to get a better understanding of the back-and-forth of
 encoding and decoding, I decided to make an inspection function.
 It prints a list of the generated tokens and the strings they represent.
+
+For some of the final bugs, I used the debugger in *Visual Studio Code*.
 
 ## Example usage
 See for yourself.

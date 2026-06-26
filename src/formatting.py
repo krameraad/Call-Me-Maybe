@@ -1,4 +1,4 @@
-"Macros for terminal text formatting."
+"Constants for terminal text formatting."
 
 X = "\033[0m"
 "Clear all text formatting."

@@ -1,3 +1,6 @@
+from pathlib import Path
+from argparse import Namespace
+
 from pydantic import BaseModel
 
 
@@ -21,3 +24,13 @@ class FunctionCall(BaseModel):
     prompt: str
     name: str
     parameters: dict[str, str | int | float | bool]
+
+
+class Args(Namespace):
+    functions_definition: list[FunctionDefinition]
+    input: list[str]
+    output: Path
+    model: str
+    dump: Path | None
+    examine: bool
+    timeout: float

@@ -7,28 +7,16 @@ run:
 		--input data/input/function_calling_tests.json \
 		--output data/output/function_calls.json
 
-examine:
+custom:
 	uv run python -m src \
-		--functions_definition data/input/functions_definition.json \
-		--input data/input/function_calling_tests.json \
-		--output data/output/function_calls.json \
-		-e
-
-dump:
-	uv run python -m src \
-		--functions_definition data/input/functions_definition.json \
-		--input data/input/function_calling_tests.json \
-		--output data/output/function_calls.json \
-		-d
-
-test_custom:
-	uv run python -m src \
-		--functions_definition data/input/custom_functions_definition.json \
-		--input data/input/custom_function_calling_tests.json \
-		--output data/output/function_calls.json
+		-f data/input/custom_functions_definition.json \
+		-i data/input/custom_function_calling_tests.json \
+		-o data/output/custom_function_calls.json \
+		-m HuggingFaceTB/SmolLM2-1.7B \
+		-t 60
 
 debug:
-	uv run python -m pdb __main__.py
+	uv run python -m pdb -m src
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +

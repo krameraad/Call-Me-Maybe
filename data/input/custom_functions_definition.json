@@ -1,35 +1,44 @@
 [
   {
-    "name": "fn_create_vector2d",
-    "description": "Create a two-dimensional vector out of two values.",
+    "name": "fn_rotate_vector2d",
+    "description": "Rotate a 2D vector as a JSON object with x and y parameters.",
     "parameters": {
-      "x": {
-        "type": "number"
+      "vector": {
+        "type": "object"
       },
-      "y": {
+      "angle": {
         "type": "number"
       }
     },
     "returns": {
-      "type": "vector2d"
+      "type": "object"
     }
   },
   {
-    "name": "fn_create_vector3d",
-    "description": "Create a three-dimensional vector out of three values.",
+    "name": "fn_rotate_vector3d",
+    "description": "Rotate a 3D vector as a JSON object with x, y and z parameters.",
     "parameters": {
-      "x": {
-        "type": "number"
+      "vector": {
+        "type": "object"
       },
-      "y": {
-        "type": "number"
-      },
-      "z": {
+      "angle": {
         "type": "number"
       }
     },
     "returns": {
-      "type": "vector3d"
+      "type": "object"
+    }
+  },
+  {
+    "name": "fn_sum",
+    "description": "Add up all numbers in the list together and return the result.",
+    "parameters": {
+      "list": {
+        "type": "array"
+      }
+    },
+    "returns": {
+      "type": "number"
     }
   }
 ]
