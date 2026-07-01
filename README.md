@@ -13,7 +13,7 @@ Output is generated in `data/output/function_calls.json`.
 
 To customize the input, you can create your own function definitions and tests
 and provide the paths to them when running using `uv run -m src ...`.
-When running directly, you can also specify `-e` and `-d` arguments,
+When running directly, you can also specify `-e` and `-d DUMP` arguments,
 which show an examination of the tokens generated
 and dump the model's vocabulary in a text file, respectively.
 
@@ -109,6 +109,13 @@ The speed is mostly thanks to the small context.
 I considered using *Numpy* in this project, but decided against it.
 It'd be a learning experience, but I didn't actually notice any performance
 improvements during testing.
+
+When using the Python cProfile module,
+I discovered that around **95%** of the program's run time
+was spent in the `get_logits_from_input_ids` function,
+with most of the rest of the time spent importing the `llm_sdk`.
+Because these are unavoidable actions,
+further optimization seemed unimportant to me.
 
 Reliability is near 100%: even argument selection is 100% for included tests.
 
