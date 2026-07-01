@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 
 class FunctionDefinition(BaseModel):
+    "Function definition following the provided JSON schema."
     name: str
     description: str
     parameters: dict[str, dict[str, str]]
@@ -12,21 +13,30 @@ class FunctionDefinition(BaseModel):
 
 
 class StateContext(BaseModel):
+    "Information to be passed between state machine states."
     functions: dict[tuple[int, ...], list[tuple[int, ...]]]
+    "Functions available to choose from."
     parameters: list[tuple[int, ...]] = []
-    param_def: tuple[int, ...]  # ","parameters":{"
-    kvsep: tuple[int, ...]  # ":"
-    sep: tuple[int, ...]  # ","
-    end: tuple[int, ...]  # "}}\n
+    "Parameters available. Filled in after a function is chosen."
+    param_def: tuple[int, ...]
+    '`","parameters":{"`'
+    kvsep: tuple[int, ...]
+    '`":"`'
+    sep: tuple[int, ...]
+    '`","`'
+    end: tuple[int, ...]
+    '`"}}\\n`'
 
 
 class FunctionCall(BaseModel):
+    "Format that the output needs to follow in order to be valid."
     prompt: str
     name: str
     parameters: dict[str, str | int | float | bool]
 
 
 class Args(Namespace):
+    "Type specification for program arguments."
     functions_definition: list[FunctionDefinition]
     input: list[str]
     output: Path

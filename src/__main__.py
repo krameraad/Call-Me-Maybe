@@ -3,7 +3,6 @@ import json
 import time
 import sys
 from pathlib import Path
-import cProfile
 
 from pydantic import ValidationError
 

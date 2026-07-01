@@ -2,7 +2,6 @@ import time
 import json
 from pathlib import Path
 from typing import Any
-from pprint import pprint
 
 from llm_sdk.llm_sdk import Small_LLM_Model
 
@@ -50,7 +49,7 @@ class LLMInterface:
                 s = s.removeprefix('[').removesuffix(']')
             elif s.startswith("(") and s.endswith(')'):
                 s = s.removeprefix('(').removesuffix(')')
-            return json.loads('[' + s + ']')
+            return list(json.loads('[' + s + ']'))
 
         type_factories = {
             "number": float,
